@@ -4,11 +4,103 @@
 // Feel free to change this version of Solidity. We support >=0.6.0 <0.7.0;
 pragma solidity 0.6.12;
 pragma experimental ABIEncoderV2;
-// Gary's Fork
+// Gary's Branch - BOO/xBOO - 0xDAO
 // These are the core Yearn libraries
 import {BaseStrategy, StrategyParams} from "@yearnvaults/contracts/BaseStrategy.sol";
 import {SafeERC20, SafeMath, IERC20, Address} from "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "@openzeppelin/contracts/math/Math.sol";
+
+interface IOxPool {
+    function stakingAddress() external view returns (address);
+
+    function solidPoolAddress() external view returns (address);
+
+    // function solidPoolInfo() external view returns (ISolidlyLens.Pool memory);
+
+    function depositLpAndStake(uint256) external;
+
+    function depositLp(uint256) external;
+
+    function withdrawLp(uint256) external;
+
+    function syncBribeTokens() external;
+
+    function notifyBribeOrFees() external;
+
+    function initialize(
+        address,
+        address,
+        address,
+        string memory,
+        string memory,
+        address,
+        address
+    ) external;
+
+    function gaugeAddress() external view returns (address);
+
+    function balanceOf(address) external view returns (uint256);
+
+    function transfer(address recipient, uint256 amount)
+        external
+        returns (bool);
+
+    function approve(address spender, uint256 amount) external returns (bool);
+}
+
+interface IMultiRewards {
+    struct Reward {
+        address rewardsDistributor;
+        uint256 rewardsDuration;
+        uint256 periodFinish;
+        uint256 rewardRate;
+        uint256 lastUpdateTime;
+        uint256 rewardPerTokenStored;
+    }
+
+    function stake(uint256) external;
+
+    function withdraw(uint256) external;
+
+    function getReward() external;
+
+    function stakingToken() external view returns (address);
+
+    function balanceOf(address) external view returns (uint256);
+
+    function earned(address, address) external view returns (uint256);
+
+    function initialize(address, address) external;
+
+    function rewardRate(address) external view returns (uint256);
+
+    function getRewardForDuration(address) external view returns (uint256);
+
+    function rewardPerToken(address) external view returns (uint256);
+
+    function rewardData(address) external view returns (Reward memory);
+
+    function rewardTokensLength() external view returns (uint256);
+
+    function rewardTokens(uint256) external view returns (address);
+
+    function totalSupply() external view returns (uint256);
+
+    function addReward(
+        address _rewardsToken,
+        address _rewardsDistributor,
+        uint256 _rewardsDuration
+    ) external;
+
+    function notifyRewardAmount(address, uint256) external;
+
+    function recoverERC20(address tokenAddress, uint256 tokenAmount) external;
+
+    function setRewardsDuration(address _rewardsToken, uint256 _rewardsDuration)
+        external;
+
+    function exit() external;
+}
 
 interface ISolidlyRouter {
     function addLiquidity(
@@ -63,19 +155,6 @@ interface ITradeFactory {
     function enable(address, address) external;
 }
 
-interface ILpDepositer {
-    function deposit(address pool, uint256 _amount) external;
-
-    function withdraw(address pool, uint256 _amount) external; // use amount = 0 for harvesting rewards
-
-    function userBalances(address user, address pool)
-        external
-        view
-        returns (uint256);
-
-    function getReward(address[] memory lps) external;
-}
-
 contract Strategy is BaseStrategy {
     using SafeERC20 for IERC20;
     using Address for address;
@@ -91,24 +170,41 @@ contract Strategy is BaseStrategy {
     bool public depositerAvoid;
     address public tradeFactory =
         address(0xD3f89C21719Ec5961a3E6B0f9bBf9F9b4180E9e9);
+    
+    address public solidPoolAddress = 
+        address(0x5804F6C40f44cF7593F73cf3aa16F7037213A623);
+    address public oxPoolAddress = 
+        address(0x12EE63e73d6BC0327439cdF700ab40849e8e4284);
+    address public stakingAddress = 
+        address(0x77831Ced767f0e24Cc69EcFc137ba45305ebC415);
+
+    IERC20 internal constant solidLp =
+        IERC20(0x5804F6C40f44cF7593F73cf3aa16F7037213A623); // Solidly BOO/xBOO
+    IERC20 internal constant oxLp =
+        IERC20(0x12EE63e73d6BC0327439cdF700ab40849e8e4284); // 0xDAO BOO/xBOO
 
     IERC20 internal constant boo =
         IERC20(0x841FAD6EAe12c286d1Fd18d1d525DFfA75C7EFFE);
     IXboo internal constant xboo =
         IXboo(0xa48d959AE2E88f1dAA7D5F611E01908106dE7598);
 
-    IERC20 internal constant sex =
-        IERC20(0xD31Fcd1f7Ba190dBc75354046F6024A9b86014d7);
+    IERC20 internal constant oxd =
+        IERC20(0xc5A9848b9d145965d821AaeC8fA32aaEE026492d);
     IERC20 internal constant solid =
         IERC20(0x888EF71766ca594DED1F0FA3AE64eD2941740A20);
 
-    uint256 public lpSlippage = 995; //0.5% slippage allowance
+    uint256 public lpSlippage = 9950; //0.5% slippage allowance
+
+    uint256 immutable DENOMINATOR = 10_000;
 
     string internal stratName; // we use this for our strategy's name on cloning
     address public lpToken =
         address(0x5804F6C40f44cF7593F73cf3aa16F7037213A623);
-    ILpDepositer public lpDepositer =
-        ILpDepositer(0x26E1A0d851CF28E697870e1b7F053B605C8b060F);
+    
+    IOxPool public oxPool =
+        IOxPool(0x12EE63e73d6BC0327439cdF700ab40849e8e4284);
+    IMultiRewards public multiRewards =
+        IMultiRewards(0x77831Ced767f0e24Cc69EcFc137ba45305ebC415);
 
     bool internal forceHarvestTriggerOnce; // only set this to true externally when we want to trigger our keepers to harvest for us
     uint256 public minHarvestCredit; // if we hit this amount of credit, harvest the strategy
@@ -119,6 +215,7 @@ contract Strategy is BaseStrategy {
         public
         BaseStrategy(_vault)
     {
+        require(vault.token() == address(boo));
         _initializeStrat(_name);
     }
 
@@ -139,11 +236,13 @@ contract Strategy is BaseStrategy {
         minHarvestCredit = type(uint256).max;
 
         // add approvals on all tokens
-        IERC20(lpToken).approve(address(lpDepositer), type(uint256).max);
         IERC20(lpToken).approve(address(solidlyRouter), type(uint256).max);
         xboo.approve(address(solidlyRouter), type(uint256).max);
         boo.approve(address(xboo), type(uint256).max);
         boo.approve(address(solidlyRouter), type(uint256).max);
+        // NEW ONES
+        IERC20(solidPoolAddress).approve(oxPoolAddress, type(uint256).max);
+        IERC20(oxPoolAddress).approve(stakingAddress, type(uint256).max);
     }
 
     /* ========== VIEWS ========== */
@@ -165,8 +264,19 @@ contract Strategy is BaseStrategy {
         return xboo.xBOOForBOO(xbooAmount);
     }
 
+    // view our balance of unstaked oxLP tokens - should be zero most of the time
+    function balanceOfOxPool() public view returns (uint256) {
+        return oxPool.balanceOf(address(this));
+    }
+
+    // view our balance of staked oxLP tokens
+    function balanceOfMultiRewards() public view returns (uint256) {
+        return multiRewards.balanceOf(address(this));
+    }
+
+    // view our balance of unstaked and staked oxLP tokens
     function balanceOfLPStaked() public view returns (uint256) {
-        return lpDepositer.userBalances(address(this), lpToken);
+        return balanceOfOxPool().add(balanceOfMultiRewards());
     }
 
     function balanceOfConstituents(uint256 liquidity)
@@ -178,7 +288,7 @@ contract Strategy is BaseStrategy {
             .quoteRemoveLiquidity(
                 address(boo),
                 address(xboo),
-                false,
+                false, // volatile pool
                 liquidity
             );
     }
@@ -205,8 +315,8 @@ contract Strategy is BaseStrategy {
         address _tradeFactory = tradeFactory;
 
         ITradeFactory tf = ITradeFactory(_tradeFactory);
-        sex.safeApprove(_tradeFactory, type(uint256).max);
-        tf.enable(address(sex), address(want));
+        oxd.safeApprove(_tradeFactory, type(uint256).max);
+        tf.enable(address(oxd), address(want));
 
         solid.safeApprove(_tradeFactory, type(uint256).max);
         tf.enable(address(solid), address(want));
@@ -228,9 +338,7 @@ contract Strategy is BaseStrategy {
             _setUpTradeFactory();
         }
         // claim our rewards
-        address[] memory pairs = new address[](1);
-        pairs[0] = address(lpToken);
-        lpDepositer.getReward(pairs);
+        multiRewards.getReward();
 
         uint256 assets = estimatedTotalAssets();
         uint256 wantBal = balanceOfWant();
@@ -249,7 +357,11 @@ contract Strategy is BaseStrategy {
             //withdraw with loss
             if (realiseLosses) {
                 _loss = debt.sub(assets);
-                _debtPayment = _debtOutstanding.sub(_loss);
+                if (_debtOutstanding > _loss) {
+                    _debtPayment = _debtOutstanding.sub(_loss);
+                } else {
+                    _debtPayment = 0;
+                }
 
                 amountToFree = _debtPayment;
             }
@@ -267,7 +379,7 @@ contract Strategy is BaseStrategy {
                     _profit = newLoose;
                     _debtPayment = 0;
                 } else {
-                    _debtPayment = Math.min(newLoose - _profit, _debtPayment);
+                    _debtPayment = Math.min(newLoose.sub(_profit), _debtPayment);
                 }
             }
         }
@@ -295,12 +407,12 @@ contract Strategy is BaseStrategy {
             uint256 ratio_xboo = xboo.xBOOForBOO(1e18);
 
             //allow 0.5% slippage by default
-            if (ratio_lp < ratio_xboo.mul(lpSlippage).div(1000)) {
+            if (ratio_lp < ratio_xboo.mul(lpSlippage).div(DENOMINATOR)) {
                 //dont do anything because we would be lping into the lp at a bad price
                 return;
             }
 
-            if (ratio_xboo < ratio_lp.mul(lpSlippage).div(1000)) {
+            if (ratio_xboo < ratio_lp.mul(lpSlippage).div(DENOMINATOR)) {
                 //dont do anything because we would be lping into the lp at a bad price
                 return;
             }
@@ -318,7 +430,7 @@ contract Strategy is BaseStrategy {
             ISolidlyRouter(solidlyRouter).addLiquidity(
                 address(boo),
                 address(xboo),
-                false,
+                false, // volatile pool
                 boo.balanceOf(address(this)),
                 xboo.balanceOf(address(this)),
                 0,
@@ -326,12 +438,14 @@ contract Strategy is BaseStrategy {
                 address(this),
                 2**256 - 1
             );
+        }
+        uint256 lpBalance = IERC20(lpToken).balanceOf(address(this));
 
-            //deposit to lp depositer
-            lpDepositer.deposit(
-                lpToken,
-                IERC20(lpToken).balanceOf(address(this))
-            );
+        if (lpBalance > 0) {
+            // Transfer Solidly LP to ox pool to receive Ox pool LP receipt token
+            oxPool.depositLp(lpBalance);
+            // Stake oxLP in multirewards
+            multiRewards.stake(oxLp.balanceOf(address(this)));
         }
     }
 
@@ -342,7 +456,7 @@ contract Strategy is BaseStrategy {
             1e18
         );
 
-        //1 lp token is this amoubt of boo
+        //1 lp token is this amount of boo
         amountBooPerLp = amountBooPerLp.add(xboo.xBOOForBOO(amountXBoo));
 
         uint256 lpTokensWeNeed = amountOfBooWeWant.mul(1e18).div(
@@ -375,33 +489,45 @@ contract Strategy is BaseStrategy {
             );
 
             if (balanceOfLpTokens < lpTokensNeeded) {
-                uint256 toWithdrawfromSolidex = lpTokensNeeded.sub(
+                uint256 toWithdrawfromOxdao = lpTokensNeeded.sub(
                     balanceOfLpTokens
                 );
 
+                // balance of oxlp staked in multiRewards
                 uint256 staked = balanceOfLPStaked();
-                lpDepositer.withdraw(
-                    lpToken,
-                    Math.min(toWithdrawfromSolidex, staked)
-                );
+
+                if (staked > 0) {
+                    // Withdraw oxLP from multiRewards
+                    multiRewards.withdraw(Math.min(toWithdrawfromOxdao, staked));
+                    // balance of oxlp in oxPool
+                    uint256 oxLpBalance = oxPool.balanceOf(address(this));
+                    // Redeem/burn oxPool LP for Solidly LP
+                    oxPool.withdrawLp(Math.min(toWithdrawfromOxdao, oxLpBalance));
+                }
 
                 balanceOfLpTokens = IERC20(lpToken).balanceOf(address(this));
             }
 
-            (uint256 amountBoo, uint256 amountxBoo) = ISolidlyRouter(
-                solidlyRouter
-            ).removeLiquidity(
-                    address(boo),
-                    address(xboo),
-                    false,
-                    Math.min(lpTokensNeeded, balanceOfLpTokens),
-                    0,
-                    0,
-                    address(this),
-                    type(uint256).max
-                );
+            uint256 amountBoo;
+            uint256 amountxBoo;
+            if (balanceOfLpTokens > 0) {
+                (amountBoo, amountxBoo) = ISolidlyRouter(solidlyRouter)
+                    .removeLiquidity(
+                        address(boo),
+                        address(xboo),
+                        false,
+                        Math.min(lpTokensNeeded, balanceOfLpTokens),
+                        0,
+                        0,
+                        address(this),
+                        type(uint256).max
+                    );
+            }
 
-            xboo.leave(xboo.balanceOf(address(this)));
+            xbooBal = xboo.balanceOf(address(this))
+            if (xbooBal > 1e7) {
+                xboo.leave(xbooBal);
+            }
 
             _liquidatedAmount = Math.min(
                 want.balanceOf(address(this)),
@@ -417,25 +543,53 @@ contract Strategy is BaseStrategy {
     }
 
     function liquidateAllPositions() internal override returns (uint256) {
-        lpDepositer.withdraw(lpToken, balanceOfLPStaked());
-        ISolidlyRouter(solidlyRouter).removeLiquidity(
-            address(boo),
-            address(xboo),
-            false,
-            IERC20(lpToken).balanceOf(address(this)),
-            0,
-            0,
-            address(this),
-            type(uint256).max
-        );
-        xboo.leave(xboo.balanceOf(address(this)));
+        // balance of oxlp staked in multiRewards
+        uint256 staked = balanceOfLPStaked();
+
+        if (staked > 0) {
+            // Withdraw oxLP from multiRewards
+            multiRewards.withdraw(staked);
+            // balance of oxlp in oxPool
+            uint256 oxLpBalance = oxPool.balanceOf(address(this));
+            // Redeem/burn oxPool LP for Solidly LP
+            oxPool.withdrawLp(oxLpBalance);
+            
+
+            ISolidlyRouter(solidlyRouter).removeLiquidity(
+                address(boo),
+                address(xboo),
+                false,
+                IERC20(lpToken).balanceOf(address(this)),
+                0,
+                0,
+                address(this),
+                type(uint256).max
+            );
+
+            xboo.leave(xboo.balanceOf(address(this)));
+        }
+
+        xbooBal = xboo.balanceOf(address(this));
+        if (xbooBal > 0) {
+            xboo.leave(xbooBal);
+        }
 
         return balanceOfWant();
     }
 
     function prepareMigration(address _newStrategy) internal override {
         if (!depositerAvoid) {
-            lpDepositer.withdraw(lpToken, balanceOfLPStaked());
+            // balance of oxlp staked in multiRewards
+            uint256 staked = balanceOfLPStaked();
+
+            if (staked > 0) {
+                // Withdraw oxLP from multiRewards
+                multiRewards.withdraw(staked);
+                // balance of oxlp in oxPool
+                uint256 oxLpBalance = oxPool.balanceOf(address(this));
+                // Redeem/burn oxPool LP for Solidly LP
+                oxPool.withdrawLp(oxLpBalance);
+            }
         }
 
         uint256 lpBalance = IERC20(lpToken).balanceOf(address(this));
@@ -452,11 +606,32 @@ contract Strategy is BaseStrategy {
         }
     }
 
-    function manualWithdraw(address lp, uint256 amount)
+    function manualWithdraw(uint256 amount)
         external
         onlyEmergencyAuthorized
     {
-        lpDepositer.withdraw(lp, amount);
+        // Withdraw oxLP from multiRewards
+        multiRewards.withdraw(amount);
+        // balance of oxlp in oxPool
+        uint256 oxLpBalance = oxPool.balanceOf(address(this));
+        // Redeem/burn oxPool LP for Solidly LP
+        oxPool.withdrawLp(Math.min(amount, oxLpBalance));
+    }
+
+    function manualWithdrawPartOne(uint256 amount)
+        external
+        onlyEmergencyAuthorized
+    {
+        // Withdraw oxLP from multiRewards
+        multiRewards.withdraw(amount);
+    }
+
+    function manualWithdrawPartTwo(uint256 amount)
+        external
+        onlyEmergencyAuthorized
+    {
+        // Redeem/burn oxPool LP for Solidly LP
+        oxPool.withdrawLp(amount);
     }
 
     function protectedTokens()
@@ -519,7 +694,7 @@ contract Strategy is BaseStrategy {
 
     function _removeTradeFactoryPermissions() internal {
         address _tradeFactory = tradeFactory;
-        sex.safeApprove(_tradeFactory, 0);
+        oxd.safeApprove(_tradeFactory, 0);
 
         solid.safeApprove(_tradeFactory, 0);
 
@@ -562,9 +737,9 @@ contract Strategy is BaseStrategy {
     }
 
     function _setLpSlippage(uint256 _slippage, bool _force) internal {
-        require(_slippage <= 10_000, "higher than max");
+        require(_slippage <= DENOMINATOR, "higher than max");
         if (!_force) {
-            require(_slippage >= 990, "higher than 1pc slippage set");
+            require(_slippage >= 9990, "higher than 1pc slippage set");
         }
         lpSlippage = _slippage;
     }
