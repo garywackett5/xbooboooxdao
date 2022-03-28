@@ -17,20 +17,20 @@ def test_yswap(
     ymechs_safe,
     chain,
     accounts,
-    solidex_router,
+    solidly_router,
+    strategy,	
+    token,	
+    whale,	
+    vault,
     interface,
     spooky_router,
     trade_factory,
-    sex,
+    oxd,
     solid,
     multicall_swapper,
     strategist_ms
 ):
-    strategy = liveBooStrat
-    vault = Contract(strategy.vault())
-    token = Contract(vault.token())
 
-    print(token)
     print("CallOnlyOptimizationRequired(): ", eth_utils.to_hex(
         eth_utils.function_signature_to_4byte_selector("CallOnlyOptimizationRequired()")))
     print("InvalidSwapper(): ", eth_utils.to_hex(
@@ -115,7 +115,7 @@ def test_yswap(
     print(afterone/1e18)
     # now do sex
 
-    id = sex
+    id = oxd
 
     # wftmboopair = Contract(
     #     '0xEc7178F4C41f346b2721907F5cF7628E388A7a58')  # spookylp
@@ -140,7 +140,7 @@ def test_yswap(
     b = optimsations[1]
 
     # send all our tokens
-    calldata = token_in.approve.encode_input(solidex_router, amount_in)
+    calldata = token_in.approve.encode_input(solidly_router, amount_in)
     t = createTx(token_in, calldata)
     a = a + t[0]
     b = b + t[1]
@@ -148,12 +148,12 @@ def test_yswap(
     step = [token_in.address, wftm, False]
     path = [step]
 
-    expectedOut = solidex_router.getAmountsOut(amount_in, path)[1]
+    expectedOut = solidly_router.getAmountsOut(amount_in, path)[1]
 
-    calldata = solidex_router.swapExactTokensForTokens.encode_input(
+    calldata = solidly_router.swapExactTokensForTokens.encode_input(
         amount_in, 0, path, multicall_swapper, 2 ** 256 - 1
     )
-    t = createTx(solidex_router, calldata)
+    t = createTx(solidly_router, calldata)
     a = a + t[0]
     b = b + t[1]
 

@@ -14,7 +14,7 @@ def test_withdraw_after_donation_1(
     amount,
 ):
 
-    ## deposit to the vault after approving
+    # deposit to the vault after approving
     token.approve(vault, 2 ** 256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     chain.sleep(1)
@@ -60,7 +60,7 @@ def test_withdraw_after_donation_1(
     assert profit > 0
 
     # specifically check that our gain is greater than our donation or confirm we're no more than 5 wei off.
-    assert new_params["totalGain"] - prev_params["totalGain"] > donation
+    assert new_params["totalGain"] - prev_params["totalGain"] >= donation*0.999
 
     # check to make sure that our debtRatio is about half of our previous debt
     assert new_params["debtRatio"] == currentDebt / 2
@@ -92,7 +92,7 @@ def test_withdraw_after_donation_2(
     amount,
 ):
 
-    ## deposit to the vault after approving
+    # deposit to the vault after approving
     token.approve(vault, 2 ** 256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     chain.sleep(1)
@@ -138,7 +138,7 @@ def test_withdraw_after_donation_2(
     assert profit > 0
 
     # specifically check that our gain is greater than our donation or confirm we're no more than 5 wei off.
-    assert new_params["totalGain"] - prev_params["totalGain"] > donation
+    assert new_params["totalGain"] - prev_params["totalGain"] >= donation*0.999
 
     # check that we didn't add any more loss, or at least no more than 2 wei
     assert new_params["totalLoss"] == prev_params["totalLoss"] or math.isclose(
@@ -167,7 +167,7 @@ def test_withdraw_after_donation_3(
     amount,
 ):
 
-    ## deposit to the vault after approving
+    # deposit to the vault after approving
     token.approve(vault, 2 ** 256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     chain.sleep(1)
@@ -213,7 +213,7 @@ def test_withdraw_after_donation_3(
     assert profit > 0
 
     # specifically check that our gain is greater than our donation or confirm we're no more than 5 wei off.
-    assert new_params["totalGain"] - prev_params["totalGain"] > donation
+    assert new_params["totalGain"] - prev_params["totalGain"] >= donation*0.999
 
     # check that we didn't add any more loss, or at least no more than 2 wei
     assert new_params["totalLoss"] == prev_params["totalLoss"] or math.isclose(
@@ -242,7 +242,7 @@ def test_withdraw_after_donation_4(
     amount,
 ):
 
-    ## deposit to the vault after approving
+    # deposit to the vault after approving
     token.approve(vault, 2 ** 256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     chain.sleep(1)
@@ -290,7 +290,7 @@ def test_withdraw_after_donation_4(
     # specifically check that our gain is greater than our donation or confirm we're no more than 5 wei off.
     assert new_params["totalGain"] - prev_params[
         "totalGain"
-    ] > donation or math.isclose(
+    ] >= donation*0.999 or math.isclose(
         new_params["totalGain"] - prev_params["totalGain"], donation, abs_tol=5
     )
 
@@ -324,7 +324,7 @@ def test_withdraw_after_donation_5(
     amount,
 ):
 
-    ## deposit to the vault after approving
+    # deposit to the vault after approving
     token.approve(vault, 2 ** 256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     chain.sleep(1)
@@ -361,7 +361,7 @@ def test_withdraw_after_donation_5(
     assert profit > 0
 
     # specifically check that our gain is greater than our donation or confirm we're no more than 5 wei off.
-    assert new_params["totalGain"] - prev_params["totalGain"] > donation
+    assert new_params["totalGain"] - prev_params["totalGain"] >= donation*0.999
 
     # check that we didn't add any more loss, or at least no more than 2 wei
     assert new_params["totalLoss"] == prev_params["totalLoss"] or math.isclose(
@@ -390,7 +390,7 @@ def test_withdraw_after_donation_6(
     amount,
 ):
 
-    ## deposit to the vault after approving
+    # deposit to the vault after approving
     token.approve(vault, 2 ** 256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     chain.sleep(1)
@@ -427,7 +427,7 @@ def test_withdraw_after_donation_6(
     assert profit > 0
 
     # specifically check that our gain is greater than our donation or confirm we're no more than 5 wei off.
-    assert new_params["totalGain"] - prev_params["totalGain"] > donation
+    assert new_params["totalGain"] - prev_params["totalGain"] >= donation*0.999
 
     # check that we didn't add any more loss, or at least no more than 2 wei
     assert new_params["totalLoss"] == prev_params["totalLoss"] or math.isclose(
@@ -456,7 +456,7 @@ def test_withdraw_after_donation_7(
     amount,
 ):
 
-    ## deposit to the vault after approving
+    # deposit to the vault after approving
     token.approve(vault, 2 ** 256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     chain.sleep(1)
@@ -502,7 +502,7 @@ def test_withdraw_after_donation_7(
     current_assets = vault.totalAssets()
 
     # assert that our total assets have gone up or stayed the same when accounting for the donation and withdrawal
-    assert current_assets >= donation - withdrawal + prev_assets
+    assert current_assets >= (donation - withdrawal + prev_assets)*0.999
 
     new_params = vault.strategies(strategy).dict()
 
@@ -520,7 +520,7 @@ def test_withdraw_after_donation_7(
     assert profit > 0
 
     # specifically check that our gain is greater than our donation or confirm we're no more than 5 wei off.
-    assert new_params["totalGain"] - prev_params["totalGain"] > donation
+    assert new_params["totalGain"] - prev_params["totalGain"] >= donation*0.999
 
     # check that we didn't add any more loss, or at least no more than 2 wei
     assert new_params["totalLoss"] == prev_params["totalLoss"] or math.isclose(
@@ -540,7 +540,7 @@ def test_withdraw_after_donation_8(
     amount,
 ):
 
-    ## deposit to the vault after approving
+    # deposit to the vault after approving
     token.approve(vault, 2 ** 256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     chain.sleep(1)
@@ -586,7 +586,7 @@ def test_withdraw_after_donation_8(
     current_assets = vault.totalAssets()
 
     # assert that our total assets have gone up or stayed the same when accounting for the donation and withdrawal
-    assert current_assets >= donation - withdrawal + prev_assets
+    assert current_assets >= (donation - withdrawal + prev_assets)*0.999
 
     new_params = vault.strategies(strategy).dict()
 
@@ -604,7 +604,7 @@ def test_withdraw_after_donation_8(
     assert profit > 0
 
     # specifically check that our gain is greater than our donation or confirm we're no more than 5 wei off.
-    assert new_params["totalGain"] - prev_params["totalGain"] > donation
+    assert new_params["totalGain"] - prev_params["totalGain"] >= donation*0.999
 
     # check that we didn't add any more loss, or at least no more than 2 wei
     assert new_params["totalLoss"] == prev_params["totalLoss"] or math.isclose(

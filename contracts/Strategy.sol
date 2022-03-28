@@ -472,7 +472,10 @@ contract Strategy is BaseStrategy {
         returns (uint256 _liquidatedAmount, uint256 _loss)
     {
         //if we have loose xboo. liquidated it
-        xboo.leave(xboo.balanceOf(address(this)));
+        uint256 xbooBal = xboo.balanceOf(address(this));
+        if (xbooBal > 1e7) {
+            xboo.leave(xbooBal);
+        }
 
         uint256 balanceOfBoo = want.balanceOf(address(this));
 
@@ -524,7 +527,7 @@ contract Strategy is BaseStrategy {
                     );
             }
 
-            xbooBal = xboo.balanceOf(address(this))
+            xbooBal = xboo.balanceOf(address(this));
             if (xbooBal > 1e7) {
                 xboo.leave(xbooBal);
             }
@@ -569,7 +572,7 @@ contract Strategy is BaseStrategy {
             xboo.leave(xboo.balanceOf(address(this)));
         }
 
-        xbooBal = xboo.balanceOf(address(this));
+        uint256 xbooBal = xboo.balanceOf(address(this));
         if (xbooBal > 0) {
             xboo.leave(xbooBal);
         }

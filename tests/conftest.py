@@ -12,7 +12,7 @@ def isolation(fn_isolation):
 # this is the name we want to give our strategy
 @pytest.fixture(scope="module")
 def strategy_name():
-    strategy_name = "boo_Xboo_veLp_Solidex"
+    strategy_name = "boo_Xboo_veLp_Oxdao"
     yield strategy_name
 
 
@@ -27,8 +27,8 @@ def weth():
 
 
 @pytest.fixture(scope="module")
-def sex():
-    yield Contract("0xD31Fcd1f7Ba190dBc75354046F6024A9b86014d7")
+def oxd():
+    yield Contract("0xc5A9848b9d145965d821AaeC8fA32aaEE026492d")
 
 
 @pytest.fixture(scope="module")
@@ -66,9 +66,12 @@ def xboo():
     yield Contract("0xa48d959AE2E88f1dAA7D5F611E01908106dE7598")
 
 
-@pytest.fixture(scope="module")
-def lpdepositer():
-    yield Contract("0x26E1A0d851CF28E697870e1b7F053B605C8b060F")
+@pytest.fixture(scope="module")	
+def ox_pool():	
+    yield Contract("0x12EE63e73d6BC0327439cdF700ab40849e8e4284")	
+@pytest.fixture(scope="module")	
+def multi_rewards():	
+    yield Contract("0x77831Ced767f0e24Cc69EcFc137ba45305ebC415")
 
 
 # Define relevant tokens and contracts in this section
@@ -81,7 +84,7 @@ def token(boo):
 def whale(accounts):
     # Update this with a large holder of your want token (the largest EOA holder of LP)
     whale = accounts.at(
-        "0x95478C4F7D22D1048F46100001c2C69D2BA57380", force=True)
+        "0x0D0707963952f2fBA59dD06f2b425ace40b492Fe", force=True)
     yield whale
 
 
@@ -95,7 +98,7 @@ def amount(token):  # use today's exchange rates to have similar $$ amounts
 # Only worry about changing things above this line, unless you want to make changes to the vault or strategy.
 # ----------------------------------------------------------------------- #
 
-
+# reward_token was set as oxdv1 - maybe because it's not used in the tests because of tradeFactory ???
 @pytest.fixture(scope="module")
 def reward_token(accounts):
     reward_token = Contract("0xc165d941481e68696f43EE6E99BFB2B23E0E3114")
@@ -123,8 +126,8 @@ def spooky_router():
 
 
 @pytest.fixture(scope="module")
-def solidex_router():
-    yield Contract("0xa38cd27185a464914D3046f0AB9d43356B34829D")
+def solidly_router():
+    yield Contract("0xa38cd27185a464914D3046f0AB9d43356B34829D") # was previously wrongly called solidex_router
 
 
 # zero address
