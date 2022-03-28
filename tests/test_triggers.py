@@ -62,7 +62,7 @@ def test_triggers(
     chain.mine(1)
 
     vault.withdraw({"from": whale})
-    assert token.balanceOf(whale) >= startingWhale
+    assert token.balanceOf(whale) >= startingWhale * 0.999
 
 
 def test_less_useful_triggers(

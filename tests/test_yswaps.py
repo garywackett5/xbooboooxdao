@@ -18,9 +18,9 @@ def test_yswap(
     chain,
     accounts,
     solidly_router,
-    strategy,	
-    token,	
-    whale,	
+    strategy,
+    token,
+    whale,
     vault,
     interface,
     spooky_router,
@@ -61,7 +61,14 @@ def test_yswap(
     # trade_factory.addSwappers([multicall_swapper], {"from": ymechs_safe})
     # strategy.updateTradeFactory(trade_factory, {'from': gov})
 
-    vault_before = token.balanceOf(vault)
+    startingWhale = token.balanceOf(whale)	
+    token.approve(vault, 2 ** 256 - 1, {"from": whale})	
+    vault.deposit(amount, {"from": whale})	
+    strategy.harvest({"from": strategist})	
+    # simulate 12 hours of earnings	
+    chain.sleep(43200)	
+    chain.mine(1)	
+    vault_before = strategy.estimatedTotalAssets()
     strat_before = token.balanceOf(strategy)
 
     strategy.harvest({"from": strategist})
@@ -113,7 +120,7 @@ def test_yswap(
 
     afterone = token_out.balanceOf(strategy)
     print(afterone/1e18)
-    # now do sex
+    # now do oxd
 
     id = oxd
 

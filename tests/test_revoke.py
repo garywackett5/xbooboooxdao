@@ -31,6 +31,7 @@ def test_revoke_strategy_from_vault(
     vault_holdings_starting = token.balanceOf(vault)
     strategy_starting = strategy.estimatedTotalAssets()
     vault.revokeStrategy(strategy.address, {"from": gov})
+    strategy.setRealiseLosses(True, {"from": gov})
 
     chain.sleep(1)
     strategy.setDoHealthCheck(False, {"from": gov})
@@ -52,4 +53,4 @@ def test_revoke_strategy_from_vault(
 
     # withdraw and confirm we made money
     vault.withdraw({"from": whale})
-    assert token.balanceOf(whale) >= startingWhale
+    assert token.balanceOf(whale) >= startingWhale*0.999
